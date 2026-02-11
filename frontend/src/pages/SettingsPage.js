@@ -6,6 +6,7 @@ export default function SettingsPage() {
   const [pin, setPin] = useState("");
   const [sound, setSound] = useState(localStorage.getItem("alert_sound") !== "false");
   const [popup, setPopup] = useState(localStorage.getItem("alert_popup") !== "false");
+  const [pinStatus, setPinStatus] = useState("");
 
   const savePrefs = () => {
     localStorage.setItem("alert_sound", String(sound));
@@ -40,7 +41,19 @@ export default function SettingsPage() {
           value={pin}
           onChange={(e) => setPin(e.target.value)}
         />
-        <button onClick={() => verifyPin(pin)}>Verify PIN</button>
+        <button
+          onClick={async () => {
+            try {
+              await verifyPin(pin);
+              setPinStatus("PIN verified");
+            } catch (err) {
+              setPinStatus(err?.message || "PIN verification failed");
+            }
+          }}
+        >
+          Verify PIN
+        </button>
+        <small>{pinStatus}</small>
         <button className="danger-lite" onClick={logout}>Logout</button>
       </div>
     </section>

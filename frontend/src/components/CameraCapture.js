@@ -204,15 +204,41 @@ export default function CameraCapture({
   };
 
   const startCamera = async () => {
-    if (!modelsReady) return;
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 960, height: 540 },
-      audio: false
-    });
-    videoRef.current.srcObject = stream;
-    setStreaming(true);
-    setStatus("Camera active");
-    loopRef.current = requestAnimationFrame(detectLoop);
+    const host = window.location.hostname;
+    const isLocalHost = host === "localhost" || host === "127.0.0.1" || host === "::1";
+
+    if (!window.isSecureContext && !isLocalHost) {
+      setStatus("Camera needs HTTPS (or localhost)");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatus("Camera API not available in this browser");
+      return;
+    }
+
+    try {
+      setStatus("Requesting camera permission...");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 960, height: 540 },
+        audio: false
+      });
+
+      videoRef.current.srcObject = stream;
+      setStreaming(true);
+      setStatus(modelsReady ? "Camera active" : "Camera active (loading AI models...)");
+      loopRef.current = requestAnimationFrame(detectLoop);
+    } catch (err) {
+      if (err?.name === "NotAllowedError") {
+        setStatus("Camera permission denied");
+      } else if (err?.name === "NotFoundError") {
+        setStatus("No camera device found");
+      } else if (err?.name === "NotReadableError") {
+        setStatus("Camera is busy in another app");
+      } else {
+        setStatus("Failed to start camera");
+      }
+    }
   };
 
   const stopCamera = () => {
@@ -239,7 +265,7 @@ export default function CameraCapture({
         <canvas ref={canvasRef} className="overlay" />
       </div>
       <div className="controls">
-        <button onClick={startCamera} disabled={!modelsReady || streaming}>Start Camera</button>
+        <button onClick={startCamera} disabled={streaming}>Start Camera</button>
         <button onClick={stopCamera} disabled={!streaming} className="danger-lite">Stop Camera</button>
       </div>
     </div>

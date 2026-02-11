@@ -29,45 +29,77 @@ export default function LoginPage() {
   };
 
   const startFaceLogin = async () => {
+    const host = window.location.hostname;
+    const isLocalHost = host === "localhost" || host === "127.0.0.1" || host === "::1";
+    if (!window.isSecureContext && !isLocalHost) {
+      setStatus("Camera needs HTTPS (or localhost)");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatus("Camera API not available in this browser");
+      return;
+    }
+
     const faceapi = getFaceApi();
     if (!faceapi) {
       setStatus("face-api.js not loaded yet");
       return;
     }
-    setFaceMode(true);
-    setStatus("Loading models...");
-    await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri("/models"),
-      faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
-      faceapi.nets.faceRecognitionNet.loadFromUri("/models")
-    ]);
 
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    videoRef.current.srcObject = stream;
-    setStatus("Scanning for Admin face...");
+    try {
+      setFaceMode(true);
+      setStatus("Loading models...");
+      await Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromUri("/models"),
+        faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
+        faceapi.nets.faceRecognitionNet.loadFromUri("/models")
+      ]);
 
-    setTimeout(async () => {
-      const det = await faceapi.detectSingleFace(videoRef.current).withFaceLandmarks().withFaceDescriptor();
-      if (!det) {
-        setStatus("No face detected");
-        return;
-      }
+      setStatus("Requesting camera permission...");
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      videoRef.current.srcObject = stream;
+      setStatus("Scanning for Admin face...");
 
-      const res = await apiGet("/api/public-faces");
-      const admin = (res.data || []).find((f) => f.name.toLowerCase() === "admin");
-      if (!admin) {
-        setStatus("No Admin face found in library");
-        return;
-      }
+      setTimeout(() => {
+        (async () => {
+          const det = await faceapi
+            .detectSingleFace(videoRef.current)
+            .withFaceLandmarks()
+            .withFaceDescriptor();
 
-      const d = distance(Array.from(det.descriptor), JSON.parse(admin.encoding));
-      if (d <= Number(localStorage.getItem("threshold") || 0.55)) {
-        await login("admin", "admin123");
-        nav("/");
+          if (!det) {
+            setStatus("No face detected");
+            return;
+          }
+
+          const res = await apiGet("/api/public-faces");
+          const admin = (res.data || []).find((f) => f.name.toLowerCase() === "admin");
+          if (!admin) {
+            setStatus("No Admin face found in library");
+            return;
+          }
+
+          const d = distance(Array.from(det.descriptor), JSON.parse(admin.encoding));
+          if (d <= Number(localStorage.getItem("threshold") || 0.55)) {
+            await login("admin", "admin123");
+            nav("/");
+          } else {
+            setStatus("Face mismatch");
+          }
+        })().catch(() => setStatus("Face login failed"));
+      }, 1800);
+    } catch (err) {
+      if (err?.name === "NotAllowedError") {
+        setStatus("Camera permission denied");
+      } else if (err?.name === "NotFoundError") {
+        setStatus("No camera device found");
+      } else if (err?.name === "NotReadableError") {
+        setStatus("Camera is busy in another app");
       } else {
-        setStatus("Face mismatch");
+        setStatus("Face login setup failed");
       }
-    }, 1800);
+    }
   };
 
   return (
