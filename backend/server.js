@@ -142,15 +142,22 @@ app.get("/api/history", auth, async (req, res) => {
   }
   if (from) {
     clauses.push("timestamp >= ?");
-    args.push(from);
+    args.push(`${from} 00:00:00`);
   }
   if (to) {
     clauses.push("timestamp <= ?");
-    args.push(to);
+    args.push(`${to} 23:59:59`);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
-  const data = await db.all(`SELECT * FROM history ${where} ORDER BY timestamp DESC LIMIT 300`, ...args);
+  const data = await db.all(
+    `SELECT id, name, image, REPLACE(timestamp, ' ', 'T') || 'Z' AS timestamp
+     FROM history
+     ${where}
+     ORDER BY timestamp DESC
+     LIMIT 300`,
+    ...args
+  );
   res.json({ data });
 });
 
