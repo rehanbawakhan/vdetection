@@ -58,6 +58,21 @@ async function initDb(config) {
       passwordHash,
       pinHash
     );
+  } else {
+    const passwordMatches = await bcrypt.compare(config.adminPassword, user.password_hash);
+    const pinMatches = await bcrypt.compare(String(config.adminPin), user.pin_hash);
+
+    if (!passwordMatches || !pinMatches) {
+      const nextPasswordHash = passwordMatches ? user.password_hash : await bcrypt.hash(config.adminPassword, 10);
+      const nextPinHash = pinMatches ? user.pin_hash : await bcrypt.hash(String(config.adminPin), 10);
+
+      await db.run(
+        "UPDATE users SET password_hash = ?, pin_hash = ? WHERE id = ?",
+        nextPasswordHash,
+        nextPinHash,
+        user.id
+      );
+    }
   }
 
   return db;
