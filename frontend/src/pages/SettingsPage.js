@@ -43,11 +43,17 @@ export default function SettingsPage() {
         />
         <button
           onClick={async () => {
+            console.log("Verifying PIN:", pin);
             try {
               await verifyPin(pin);
               setPinStatus("PIN verified");
             } catch (err) {
-              setPinStatus(err?.message || "PIN verification failed");
+              console.error("PIN Error:", err);
+              if (err.message && (err.message.includes("Invalid token") || err.message.includes("jwt expired"))) {
+                logout();
+              } else {
+                setPinStatus(err.message || "Invalid PIN");
+              }
             }
           }}
         >

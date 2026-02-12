@@ -11,14 +11,12 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from(raw, (char) => char.charCodeAt(0));
 }
 
-export default function DashboardPage({ faces, setFaces, history, setHistory }) {
+export default function DashboardPage({ faces, setFaces, history, refreshHistory }) {
   const { token } = useAuth();
   const [loading, setLoading] = useState(true);
   const [activeAlert, setActiveAlert] = useState(null);
   const [threshold, setThreshold] = useState(Number(localStorage.getItem("threshold") || 0.55));
-  const [historyName, setHistoryName] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+
 
   const alertPrefs = useMemo(
     () => ({
@@ -31,16 +29,18 @@ export default function DashboardPage({ faces, setFaces, history, setHistory }) 
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [faceRes, historyRes] = await Promise.all([
-        apiGet("/api/known-faces", token),
-        apiGet("/api/history", token)
-      ]);
-      setFaces(faceRes.data || []);
-      setHistory(historyRes.data || []);
-      setLoading(false);
+      try {
+        const faceRes = await apiGet("/api/known-faces", token);
+        setFaces(faceRes.data || []);
+        await refreshHistory(); // Initial load
+      } catch (err) {
+        console.error("Dashboard load failed", err);
+      } finally {
+        setLoading(false);
+      }
     }
-    load().catch(() => setLoading(false));
-  }, [token, setFaces, setHistory]);
+    load();
+  }, [token, setFaces, refreshHistory]);
 
   useEffect(() => {
     async function setupPush() {
@@ -62,31 +62,22 @@ export default function DashboardPage({ faces, setFaces, history, setHistory }) 
       }
     }
 
-    setupPush().catch(() => {});
+    setupPush().catch(() => { });
   }, [token]);
 
   const handleAlert = async (alert) => {
     setActiveAlert(alert);
-    await apiPost("/api/alert", alert, token).catch(() => {});
-    const historyRes = await apiGet("/api/history", token).catch(() => ({ data: [] }));
-    setHistory(historyRes.data || []);
+    await apiPost("/api/alert", alert, token).catch(() => { });
+    await refreshHistory(); // Updates history respecting filters
   };
 
   const handleRecognized = async (entry) => {
     if (!entry || !entry.name || entry.name === "Unknown") return;
-    await apiPost("/api/history", { name: entry.name, image: entry.image }, token).catch(() => {});
-    const historyRes = await apiGet("/api/history", token).catch(() => ({ data: [] }));
-    setHistory(historyRes.data || []);
+    await apiPost("/api/history", { name: entry.name, image: entry.image }, token).catch(() => { });
+    await refreshHistory(); // Updates history respecting filters
   };
 
-  const applyHistoryFilter = async () => {
-    const q = new URLSearchParams();
-    if (historyName) q.set("name", historyName);
-    if (from) q.set("from", from);
-    if (to) q.set("to", to);
-    const res = await apiGet(`/api/history${q.toString() ? `?${q.toString()}` : ""}`, token);
-    setHistory(res.data || []);
-  };
+
 
   if (loading) {
     return (
@@ -141,16 +132,7 @@ export default function DashboardPage({ faces, setFaces, history, setHistory }) 
         onRecognized={handleRecognized}
       />
 
-      <div className="glass-card filter-panel">
-        <h3>History Filter</h3>
-        <div className="inline-filters">
-          <input placeholder="Name" value={historyName} onChange={(e) => setHistoryName(e.target.value)} />
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-          <button onClick={applyHistoryFilter}>Apply</button>
-          <button onClick={() => apiGet("/api/history", token).then((r) => setHistory(r.data || []))}>Reset</button>
-        </div>
-      </div>
+
     </section>
   );
 }

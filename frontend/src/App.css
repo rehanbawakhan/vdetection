@@ -126,6 +126,8 @@ body {
 .video-wrap {
   position: relative;
   width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 12px;
@@ -313,29 +315,61 @@ button:disabled {
 }
 
 @keyframes radar-scan {
-  from { transform: translateY(0); }
-  to { transform: translateY(540px); }
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(540px);
+  }
 }
 
 @keyframes pulse-alert {
-  0% { box-shadow: 0 0 8px rgba(255, 59, 79, 0.4); }
-  50% { box-shadow: 0 0 20px rgba(255, 59, 79, 0.95); }
-  100% { box-shadow: 0 0 8px rgba(255, 59, 79, 0.4); }
+  0% {
+    box-shadow: 0 0 8px rgba(255, 59, 79, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(255, 59, 79, 0.95);
+  }
+
+  100% {
+    box-shadow: 0 0 8px rgba(255, 59, 79, 0.4);
+  }
 }
 
 @keyframes progress {
-  0% { background-position: -240px 0; }
-  100% { background-position: 240px 0; }
+  0% {
+    background-position: -240px 0;
+  }
+
+  100% {
+    background-position: 240px 0;
+  }
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 980px) {

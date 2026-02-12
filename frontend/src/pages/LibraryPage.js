@@ -4,14 +4,20 @@ import { useAuth } from "../context/AuthContext";
 import { getFaceApi } from "../faceApiClient";
 
 export default function LibraryPage({ faces, setFaces }) {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const [form, setForm] = useState({ name: "", image_url: "", encoding: "[]" });
   const [filters, setFilters] = useState({ name: "", wantedOnly: false });
   const [extractStatus, setExtractStatus] = useState("No image selected");
 
   useEffect(() => {
-    apiGet("/api/known-faces", token).then((res) => setFaces(res.data || [])).catch(() => {});
-  }, [token, setFaces]);
+    apiGet("/api/known-faces", token)
+      .then((res) => setFaces(res.data || []))
+      .catch((err) => {
+        if (err.message && (err.message.includes("Invalid token") || err.message.includes("jwt expired"))) {
+          logout();
+        }
+      });
+  }, [token, setFaces, logout]);
 
   const filteredFaces = useMemo(() => {
     return faces.filter((f) => {
@@ -23,10 +29,18 @@ export default function LibraryPage({ faces, setFaces }) {
 
   const addFace = async (e) => {
     e.preventDefault();
-    await apiPost("/api/known-faces", form, token);
-    const res = await apiGet("/api/known-faces", token);
-    setFaces(res.data || []);
-    setForm({ name: "", image_url: "", encoding: "[]" });
+    try {
+      await apiPost("/api/known-faces", form, token);
+      const res = await apiGet("/api/known-faces", token);
+      setFaces(res.data || []);
+      setForm({ name: "", image_url: "", encoding: "[]" });
+    } catch (err) {
+      if (err.message && (err.message.includes("Invalid token") || err.message.includes("jwt expired"))) {
+        logout();
+      } else {
+        alert(err.message || "Failed to add face");
+      }
+    }
   };
 
   const fileToDataUrl = (file) =>
@@ -67,14 +81,30 @@ export default function LibraryPage({ faces, setFaces }) {
   };
 
   const toggleWanted = async (id, is_wanted) => {
-    await apiPut(`/api/known-faces/${id}`, { is_wanted: !is_wanted }, token);
-    const res = await apiGet("/api/known-faces", token);
-    setFaces(res.data || []);
+    try {
+      await apiPut(`/api/known-faces/${id}`, { is_wanted: !is_wanted }, token);
+      const res = await apiGet("/api/known-faces", token);
+      setFaces(res.data || []);
+    } catch (err) {
+      if (err.message && (err.message.includes("Invalid token") || err.message.includes("jwt expired"))) {
+        logout();
+      } else {
+        alert(err.message || "Failed to update face");
+      }
+    }
   };
 
   const removeFace = async (id) => {
-    await apiDelete(`/api/known-faces/${id}`, token);
-    setFaces(faces.filter((f) => f.id !== id));
+    try {
+      await apiDelete(`/api/known-faces/${id}`, token);
+      setFaces(faces.filter((f) => f.id !== id));
+    } catch (err) {
+      if (err.message && (err.message.includes("Invalid token") || err.message.includes("jwt expired"))) {
+        logout();
+      } else {
+        alert(err.message || "Failed to delete face");
+      }
+    }
   };
 
   return (

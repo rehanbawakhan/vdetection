@@ -24,8 +24,12 @@ export default function LoginPage() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    await login(username, password);
-    nav("/");
+    try {
+      await login(username, password);
+      nav("/");
+    } catch (err) {
+      setStatus(err.message || "Invalid credentials");
+    }
   };
 
   const startFaceLogin = async () => {

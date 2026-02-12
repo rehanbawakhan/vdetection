@@ -165,8 +165,14 @@ app.post("/api/history", auth, async (req, res) => {
   const { name, image = "" } = req.body;
   if (!name) return res.status(400).json({ message: "name required" });
   const db = getDb();
-  await db.run("INSERT INTO history (name, image) VALUES (?, ?)", name, image);
+  await db.run("INSERT INTO history (name, image, timestamp) VALUES (?, ?, datetime('now'))", name, image);
   return res.status(201).json({ ok: true });
+});
+
+app.delete("/api/history", auth, async (req, res) => {
+  const db = getDb();
+  await db.run("DELETE FROM history");
+  res.json({ ok: true });
 });
 
 app.post("/api/subscribe", auth, async (req, res) => {
@@ -194,8 +200,8 @@ app.post("/api/alert", auth, async (req, res) => {
   if (!name) return res.status(400).json({ message: "name required" });
 
   const db = getDb();
-  await db.run("INSERT INTO alerts (name, alert_type) VALUES (?, ?)", name, alert_type);
-  await db.run("INSERT INTO history (name, image) VALUES (?, ?)", name, image);
+  await db.run("INSERT INTO alerts (name, alert_type, timestamp) VALUES (?, ?, datetime('now'))", name, alert_type);
+  await db.run("INSERT INTO history (name, image, timestamp) VALUES (?, ?, datetime('now'))", name, image);
 
   if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
     const subs = await db.all("SELECT payload FROM push_subscriptions");
