@@ -1,47 +1,32 @@
 # FaceWatch AI
 
-FaceWatch AI is a full-stack face recognition web app with real-time webcam detection, wanted-person alerts, history tracking, and protected admin workflows.
+FaceWatch AI is a full-stack face recognition dashboard with:
+- live camera recognition
+- face library management
+- face login
+- wanted-person alerting (email + optional web push)
+- history tracking
 
 ## Stack
-
-- Frontend: React 18, React Router, face-api.js
-- Backend: Node.js, Express, JWT auth
+- Frontend: React 18, React Router, `face-api.js`
+- Backend: Node.js, Express, JWT auth (HTTP-only cookie)
 - Database: SQLite (`backend/facewatch.db`)
-- Notifications: Browser Notification API + optional Web Push (`web-push`)
+- Email alerts: `nodemailer`
+- Push alerts: `web-push` (optional)
 
-## Model Weights (Included)
-
-The required face-api model weights are already present in this repo under `frontend/public/models`.
-
-- `ssd_mobilenetv1_model-weights_manifest.json`
-- `ssd_mobilenetv1_model-shard1`
-- `ssd_mobilenetv1_model-shard2`
-- `face_landmark_68_model-weights_manifest.json`
-- `face_landmark_68_model-shard1`
-- `face_recognition_model-weights_manifest.json`
-- `face_recognition_model-shard1`
-- `face_recognition_model-shard2`
-
-The app loads models from `/models` in `frontend/src/components/CameraCapture.js`.
-
-## TensorFlow / face-api Runtime
-
-Scripts are loaded from CDN in `frontend/public/index.html`:
-
-- `@tensorflow/tfjs-core@1.7.4`
-- `@tensorflow/tfjs-converter@1.7.4`
-- `@tensorflow/tfjs-backend-webgl@1.7.4`
-- `face-api.js@0.22.2`
+## Requirements
+- Node.js 18+
+- npm 9+
 
 ## Project Structure
-
 ```text
 vdetection/
   backend/
     server.js
     db.js
-    .env.example
     facewatch.db
+    .env
+    .env.example
   frontend/
     public/
       index.html
@@ -52,146 +37,147 @@ vdetection/
       context/
       pages/
       routes/
-      App.js
-      App.css
       api.js
   package.json
   README.md
 ```
 
-## Prerequisites
-
-- Node.js 18+
-- npm 9+
-
-## Installation
-
+## 1. Install Dependencies
+From project root:
 ```bash
 npm run install:all
 ```
 
-## Environment Variables
+## 2. Configure Environment Files
+Create and edit:
+- `backend/.env`
+- `frontend/.env` (optional if default API URL is fine)
 
-### Backend (`backend/.env`)
+### Backend `.env` Example
+Use this as a complete template:
+```env
+PORT=5000
+JWT_SECRET=change_me_super_secret
 
-Create from example:
+ADMIN_USER=admin
+ADMIN_PASSWORD=change_me_admin_password
+ADMIN_PIN=1234
 
-```bash
-copy backend\\.env.example backend\\.env
+# CORS (comma-separated if multiple)
+CORS_ORIGINS=http://localhost:3000
+
+# Email alert destination
+ALERT_TO_EMAIL=you@example.com
+
+# Nodemailer SMTP config
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=yourgmail@gmail.com
+SMTP_PASS=your_16_char_gmail_app_password
+
+# Optional push notifications
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+ALERT_EMAIL=mailto:your-email@example.com
 ```
 
-Available variables:
-
-- `PORT` (default `5000`)
-- `JWT_SECRET`
-- `ADMIN_USER` (default `admin`)
-- `ADMIN_PASSWORD` (default `admin123`)
-- `ADMIN_PIN` (default `1234`)
-- `VAPID_PUBLIC_KEY` (optional)
-- `VAPID_PRIVATE_KEY` (optional)
-- `ALERT_EMAIL` (optional, for VAPID contact)
-
-### Frontend (`frontend/.env`)
-
-Create from example:
-
-```bash
-copy frontend\\.env.example frontend\\.env
+### Frontend `.env` Example
+```env
+REACT_APP_API_URL=http://localhost:5000
 ```
 
-Variables:
+## 3. Configure Nodemailer (Gmail SMTP)
+If you want email alerts for wanted detections, set Gmail SMTP values in `backend/.env`.
 
-- `REACT_APP_API_URL` (default `http://localhost:5000`)
+### Create `SMTP_PASS` (Gmail App Password)
+1. Open your Google account security settings.
+2. Enable 2-Step Verification for the Gmail account used as `SMTP_USER`.
+3. Open App Passwords.
+4. Create a new app password (Mail / custom name like `FaceWatch`).
+5. Copy the generated 16-character password.
+6. Put that value in `SMTP_PASS` (no spaces).
 
-## Run
+Use:
+- `SMTP_HOST=smtp.gmail.com`
+- `SMTP_PORT=587`
+- `SMTP_USER=<your gmail>`
+- `SMTP_PASS=<app password>`
+- `ALERT_TO_EMAIL=<recipient email>`
+
+## 4. Start the Website
+Run in two terminals from project root.
 
 Terminal 1:
-
 ```bash
 npm run start:backend
 ```
 
 Terminal 2:
-
 ```bash
 npm run start:frontend
 ```
 
+Open:
 - Frontend: `http://localhost:3000`
-- Backend: `http://localhost:5000`
-- Health check: `GET http://localhost:5000/health`
+- Backend health: `http://localhost:5000/health`
 
-## Default Admin Credentials
+## 5. First Login
+Use values from `backend/.env`:
+- Username = `ADMIN_USER`
+- Password = `ADMIN_PASSWORD`
+- PIN = `ADMIN_PIN`
 
-- Username: `admin`
-- Password: `admin123`
-- PIN: `1234`
+## 6. Add Face for Face Login
+1. Login with username/password.
+2. Go to Library.
+3. Add face with `name=admin`.
+4. Save encoding.
+5. Logout, then use Face Login.
 
-Change these immediately via environment variables in production.
+## 7. Alert Behavior (Current)
+- Wanted match: sends alert to backend (`/api/alert`) and can trigger email/push.
+- Known non-wanted match: no alert sent.
+- Unknown: no alert sent.
 
-## Features
+## API Overview
 
-- Real-time webcam face detection and descriptor matching
-- Bounding box + identity/confidence overlay
-- Face library CRUD (name, encoding, image URL, wanted flag)
-- Upload image and auto-extract encoding
-- Wanted-person alert flow with throttling
-- Alert banner, sound, and optional browser popup
-- History logging with filters (name/date range)
-- JWT login and PIN-protected routes
-- Optional web push subscription and alert fanout
-
-## API Summary
-
-Auth:
-
+### Auth
 - `POST /api/auth/login`
+- `POST /api/auth/face-login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
 - `POST /api/auth/pin`
 
-Faces:
-
+### Faces
 - `GET /api/known-faces`
 - `POST /api/known-faces`
 - `PUT /api/known-faces/:id`
 - `DELETE /api/known-faces/:id`
 - `GET /api/public-faces`
 
-History:
-
+### History
 - `GET /api/history`
 - `POST /api/history`
 - `DELETE /api/history`
 
-Alerts / Push:
-
+### Alerts / Push
 - `POST /api/alert`
 - `POST /api/subscribe`
 - `GET /api/push-key`
 
-Other:
-
-- `GET /health`
-
-## Database Tables
-
-Created automatically by `backend/db.js`:
-
-- `known_faces`
-- `history`
-- `alerts`
-- `users`
-- `push_subscriptions`
-
-## Recognition Notes
-
-- Match threshold default: `0.55` (adjustable in dashboard)
-- Matching uses Euclidean distance on face descriptors
-- Alert type used for wanted detections: `wanted_match`
+### Settings
+- `GET /api/settings`
+- `POST /api/settings`
+- `GET /api/config`
+- `POST /api/config`
 
 ## Troubleshooting
-
 - Camera requires HTTPS except on localhost.
-- If model load fails, verify files exist in `frontend/public/models`.
-- If push notifications do not work, verify valid VAPID keys are configured.
+- If face models fail to load, verify files exist under `frontend/public/models`.
+- If email is not sent:
+  - confirm `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+  - confirm `ALERT_TO_EMAIL`
+  - check backend terminal logs for nodemailer errors
+- If login fails after changing `.env`, restart backend.
 
 Main Developer: rehan bawakhan
