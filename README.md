@@ -1,20 +1,52 @@
-# FaceWatch AI - Full-Face Recognition Web App
+# FaceWatch AI
 
-Fullstack project with:
-- React frontend (CRA-compatible structure)
-- Node.js + Express backend
-- SQLite database
-- Real-time webcam face detection/recognition with `face-api.js`
-- Neon/dark animated dashboard, alerts, history, settings, PIN verify
+FaceWatch AI is a full-stack face recognition web app with real-time webcam detection, wanted-person alerts, history tracking, and protected admin workflows.
 
-## 1. Project Structure
+## Stack
+
+- Frontend: React 18, React Router, face-api.js
+- Backend: Node.js, Express, JWT auth
+- Database: SQLite (`backend/facewatch.db`)
+- Notifications: Browser Notification API + optional Web Push (`web-push`)
+
+## Model Weights (Included)
+
+The required face-api model weights are already present in this repo under `frontend/public/models`.
+
+- `ssd_mobilenetv1_model-weights_manifest.json`
+- `ssd_mobilenetv1_model-shard1`
+- `ssd_mobilenetv1_model-shard2`
+- `face_landmark_68_model-weights_manifest.json`
+- `face_landmark_68_model-shard1`
+- `face_recognition_model-weights_manifest.json`
+- `face_recognition_model-shard1`
+- `face_recognition_model-shard2`
+
+The app loads models from `/models` in `frontend/src/components/CameraCapture.js`.
+
+## TensorFlow / face-api Runtime
+
+Scripts are loaded from CDN in `frontend/public/index.html`:
+
+- `@tensorflow/tfjs-core@1.7.4`
+- `@tensorflow/tfjs-converter@1.7.4`
+- `@tensorflow/tfjs-backend-webgl@1.7.4`
+- `face-api.js@0.22.2`
+
+## Project Structure
 
 ```text
 vdetection/
+  backend/
+    server.js
+    db.js
+    .env.example
+    facewatch.db
   frontend/
     public/
       index.html
-      models/              <- put face-api models here
+      sw.js
+      models/
     src/
       components/
       context/
@@ -23,175 +55,141 @@ vdetection/
       App.js
       App.css
       api.js
-      index.js
-    package.json
-  backend/
-    db.js
-    server.js
-    package.json
-    .env.example
   package.json
-  .gitignore
+  README.md
 ```
 
-## 2. Setup
+## Prerequisites
 
-### Prerequisites
 - Node.js 18+
 - npm 9+
 
-### Install all dependencies
+## Installation
+
 ```bash
 npm run install:all
 ```
 
-### Configure backend env
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+Create from example:
+
 ```bash
 copy backend\\.env.example backend\\.env
 ```
-Update values in `backend/.env`:
-- `JWT_SECRET`
-- `ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_PIN`
-- Optional push keys: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `ALERT_EMAIL`
 
-Optional frontend env:
+Available variables:
+
+- `PORT` (default `5000`)
+- `JWT_SECRET`
+- `ADMIN_USER` (default `admin`)
+- `ADMIN_PASSWORD` (default `admin123`)
+- `ADMIN_PIN` (default `1234`)
+- `VAPID_PUBLIC_KEY` (optional)
+- `VAPID_PRIVATE_KEY` (optional)
+- `ALERT_EMAIL` (optional, for VAPID contact)
+
+### Frontend (`frontend/.env`)
+
+Create from example:
+
 ```bash
 copy frontend\\.env.example frontend\\.env
 ```
 
-### Download face-api.js models
-Create folder:
-- `frontend/public/models`
+Variables:
 
-Download model files for:
-- `ssd_mobilenetv1`
-- `face_landmark_68`
-- `face_recognition`
+- `REACT_APP_API_URL` (default `http://localhost:5000`)
 
-(Weights and manifest files from official `face-api.js` model assets.)
-The app loads `face-api.js` and TensorFlow JS via CDN script tags in `frontend/public/index.html`.
-
-## 3. Run
+## Run
 
 Terminal 1:
+
 ```bash
 npm run start:backend
 ```
 
 Terminal 2:
+
 ```bash
 npm run start:frontend
 ```
 
-Frontend: `http://localhost:3000`
-Backend: `http://localhost:5000`
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:5000`
+- Health check: `GET http://localhost:5000/health`
 
-Default login:
+## Default Admin Credentials
+
 - Username: `admin`
 - Password: `admin123`
 - PIN: `1234`
 
-## 4. Features Implemented
+Change these immediately via environment variables in production.
 
-### Frontend
-- React Router screens: Dashboard, Library, Settings, Login
-- `CameraCapture` with WebRTC
-- `face-api.js` live detection loop
-- Face embedding match against DB encodings
-- Bounding box + name + confidence label overlay
-- Red glowing animated alert banner for wanted matches
-- Sidebar panels:
-  - Face library summary
-  - History logs
-- Library CRUD UI:
-  - Add face (name + image + encoding)
-  - Upload image and auto-extract encoding
-  - Toggle wanted flag
-  - Delete face
-- Settings:
-  - Alert sound toggle
-  - Browser popup toggle
-  - PIN verification
-  - Threshold slider
-- Auth:
-  - Username/password login
-  - Face login option (matches `Admin` face)
-- Animated neon dark UI:
-  - Radar scan effect
-  - Pulse alerts
-  - Loading bars
-  - Glow transitions
+## Features
 
-### Backend
-- Express API in `backend/server.js`
-- Security:
-  - `helmet`
-  - rate limit on auth routes
-  - JWT auth middleware
-- Endpoints:
-  - `GET /api/known-faces`
-  - `POST /api/known-faces`
-  - `PUT /api/known-faces/:id`
-  - `DELETE /api/known-faces/:id`
-  - `GET /api/history`
-  - `POST /api/history`
-  - `POST /api/alert`
-  - `POST /api/subscribe`
-  - `POST /api/auth/login`
-  - `POST /api/auth/pin`
-- Push notification integration using `web-push` for alert fanout
+- Real-time webcam face detection and descriptor matching
+- Bounding box + identity/confidence overlay
+- Face library CRUD (name, encoding, image URL, wanted flag)
+- Upload image and auto-extract encoding
+- Wanted-person alert flow with throttling
+- Alert banner, sound, and optional browser popup
+- History logging with filters (name/date range)
+- JWT login and PIN-protected routes
+- Optional web push subscription and alert fanout
 
-## 5. Database Schema
+## API Summary
 
-Initialized automatically in `backend/db.js`.
+Auth:
 
-```sql
-CREATE TABLE known_faces(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  encoding TEXT NOT NULL,
-  image_url TEXT,
-  is_wanted INTEGER DEFAULT 0
-);
+- `POST /api/auth/login`
+- `POST /api/auth/pin`
 
-CREATE TABLE history(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  image TEXT,
-  timestamp TEXT NOT NULL DEFAULT (datetime('now'))
-);
+Faces:
 
-CREATE TABLE alerts(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  timestamp TEXT NOT NULL DEFAULT (datetime('now')),
-  alert_type TEXT NOT NULL
-);
-```
+- `GET /api/known-faces`
+- `POST /api/known-faces`
+- `PUT /api/known-faces/:id`
+- `DELETE /api/known-faces/:id`
+- `GET /api/public-faces`
 
-## 6. How To Add / Train Faces
+History:
 
-1. Open **Library** page.
-2. Add:
-   - `name`
-   - `image_url` (URL/base64) or upload a file
-   - `encoding` (auto-filled from upload or manual JSON)
-3. Save.
-4. Toggle wanted status if needed.
+- `GET /api/history`
+- `POST /api/history`
+- `DELETE /api/history`
 
-Notes:
-- Recognition compares live descriptor vs saved descriptor using Euclidean distance.
-- Match triggers when `distance <= threshold` (default `0.55`).
+Alerts / Push:
 
-## 7. Alert + Notification Flow
+- `POST /api/alert`
+- `POST /api/subscribe`
+- `GET /api/push-key`
 
-When a wanted face is detected:
-1. Frontend shows animated red alert and optional sound.
-2. Browser Notification API popup is fired (if granted).
-3. Frontend posts to `POST /api/alert`.
-4. Backend stores `alerts` + `history` and sends web-push notifications (if VAPID is configured).
+Other:
 
-## 8. PostgreSQL Option
+- `GET /health`
 
-Current implementation uses SQLite for fast local setup.
-To use PostgreSQL, replace `backend/db.js` with a `pg` client implementation and keep the same schema/tables and endpoint contracts.
+## Database Tables
+
+Created automatically by `backend/db.js`:
+
+- `known_faces`
+- `history`
+- `alerts`
+- `users`
+- `push_subscriptions`
+
+## Recognition Notes
+
+- Match threshold default: `0.55` (adjustable in dashboard)
+- Matching uses Euclidean distance on face descriptors
+- Alert type used for wanted detections: `wanted_match`
+
+## Troubleshooting
+
+- Camera requires HTTPS except on localhost.
+- If model load fails, verify files exist in `frontend/public/models`.
+- If push notifications do not work, verify valid VAPID keys are configured.
