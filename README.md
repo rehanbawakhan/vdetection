@@ -48,10 +48,20 @@ From project root:
 npm run install:all
 ```
 
+If you need to install nodemailer manually:
+```bash
+npm install nodemailer
+```
+
 ## 2. Configure Environment Files
 Create and edit:
 - `backend/.env`
 - `frontend/.env` (optional if default API URL is fine)
+
+Windows command to create backend env from example:
+```bash
+copy backend\\.env.example backend\\.env
+```
 
 ### Backend `.env` Example
 Use this as a complete template:
