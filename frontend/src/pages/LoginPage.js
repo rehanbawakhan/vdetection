@@ -4,6 +4,10 @@ import { apiGet } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { getFaceApi } from "../faceApiClient";
 
+const FACE_LOGIN_DEFAULT_THRESHOLD = 0.62;
+const FACE_LOGIN_MIN_THRESHOLD = 0.35;
+const FACE_LOGIN_MAX_THRESHOLD = 0.9;
+
 function distance(a, b) {
   let sum = 0;
   for (let i = 0; i < a.length; i += 1) {
@@ -14,7 +18,7 @@ function distance(a, b) {
 }
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, faceLogin } = useAuth();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin123");
   const [status, setStatus] = useState("Use credentials or face login");
@@ -64,36 +68,60 @@ export default function LoginPage() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       videoRef.current.srcObject = stream;
       setStatus("Scanning for Admin face...");
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      const res = await apiGet("/api/public-faces");
+      const admin = (res.data || []).find((f) => f.name.toLowerCase() === "admin");
+      if (!admin) {
+        setStatus("No Admin face found in library");
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
 
-      setTimeout(() => {
-        (async () => {
-          const det = await faceapi
-            .detectSingleFace(videoRef.current)
-            .withFaceLandmarks()
-            .withFaceDescriptor();
+      const savedThreshold = Number(localStorage.getItem("faceLoginThreshold"));
+      const threshold = Number.isFinite(savedThreshold)
+        && savedThreshold >= FACE_LOGIN_MIN_THRESHOLD
+        && savedThreshold <= FACE_LOGIN_MAX_THRESHOLD
+        ? savedThreshold
+        : FACE_LOGIN_DEFAULT_THRESHOLD;
 
-          if (!det) {
-            setStatus("No face detected");
-            return;
-          }
-
-          const res = await apiGet("/api/public-faces");
-          const admin = (res.data || []).find((f) => f.name.toLowerCase() === "admin");
-          if (!admin) {
-            setStatus("No Admin face found in library");
-            return;
-          }
-
+      let bestDistance = Infinity;
+      for (let i = 0; i < 12; i += 1) {
+        const det = await faceapi
+          .detectSingleFace(videoRef.current)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+        if (det) {
           const d = distance(Array.from(det.descriptor), JSON.parse(admin.encoding));
-          if (d <= Number(localStorage.getItem("threshold") || 0.55)) {
-            await login("admin", "admin123");
-            nav("/");
-          } else {
-            setStatus("Face mismatch");
-          }
-        })().catch(() => setStatus("Face login failed"));
-      }, 1800);
+          if (d < bestDistance) bestDistance = d;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+
+      if (!Number.isFinite(bestDistance)) {
+        setStatus("No face detected");
+        return;
+      }
+
+      if (bestDistance <= threshold) {
+        try {
+          // Face match is validated against Admin embedding, so log in as admin directly.
+          await faceLogin("admin");
+          nav("/");
+        } catch (err) {
+          setStatus(err.message || "Face matched, but face login request failed");
+        }
+      } else {
+        setStatus(`Face mismatch (${bestDistance.toFixed(3)} > ${threshold.toFixed(3)})`);
+      }
     } catch (err) {
+      const stream = videoRef.current?.srcObject;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        videoRef.current.srcObject = null;
+      }
       if (err?.name === "NotAllowedError") {
         setStatus("Camera permission denied");
       } else if (err?.name === "NotFoundError") {

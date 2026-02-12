@@ -41,10 +41,6 @@ export default function App() {
       {token && (
         <Sidebar
           faces={faces}
-          history={history}
-          historyFilters={historyFilters}
-          setHistoryFilters={setHistoryFilters}
-          refreshHistory={refreshHistory}
         />
       )}
       <main className="main-panel">

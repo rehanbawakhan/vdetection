@@ -1,13 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { NavLink } from "react-router-dom";
-import { apiGet } from "../api";
-import { useAuth } from "../context/AuthContext";
 
-export default function Sidebar({ faces, history, historyFilters, setHistoryFilters, refreshHistory }) {
-  const { token, logout } = useAuth();
-
-
-
+export default function Sidebar({ faces }) {
   return (
     <aside className="sidebar glass-card">
       <h1 className="brand">FaceWatch AI</h1>

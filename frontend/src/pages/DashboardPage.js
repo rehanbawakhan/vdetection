@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
-import CameraCapture from "../components/CameraCapture";
+import React, { useEffect, useState } from "react";
+import CameraFeed from "../components/CameraFeed";
 import AlertBanner from "../components/AlertBanner";
+import HistoryList from "../components/HistoryList";
 import { apiGet, apiPost } from "../api";
 import { useAuth } from "../context/AuthContext";
 
@@ -15,24 +16,28 @@ export default function DashboardPage({ faces, setFaces, history, refreshHistory
   const { token } = useAuth();
   const [loading, setLoading] = useState(true);
   const [activeAlert, setActiveAlert] = useState(null);
-  const [threshold, setThreshold] = useState(Number(localStorage.getItem("threshold") || 0.55));
-
-
-  const alertPrefs = useMemo(
-    () => ({
-      sound: localStorage.getItem("alert_sound") !== "false",
-      popup: localStorage.getItem("alert_popup") !== "false"
-    }),
-    [activeAlert]
-  );
+  const [settings, setSettings] = useState({ threshold: 0.55, sound: true, popup: true });
+  const [toasts, setToasts] = useState([]);
+  const [settingsReady, setSettingsReady] = useState(false);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const faceRes = await apiGet("/api/known-faces", token);
+        const [faceRes, settingsRes] = await Promise.all([
+          apiGet("/api/known-faces", token),
+          apiGet("/api/settings", token).catch(() => ({ data: null }))
+        ]);
         setFaces(faceRes.data || []);
-        await refreshHistory(); // Initial load
+        if (settingsRes.data) {
+          setSettings({
+            threshold: Number(settingsRes.data.threshold ?? 0.55),
+            sound: Boolean(settingsRes.data.sound),
+            popup: Boolean(settingsRes.data.popup)
+          });
+        }
+        setSettingsReady(true);
+        await refreshHistory();
       } catch (err) {
         console.error("Dashboard load failed", err);
       } finally {
@@ -43,7 +48,16 @@ export default function DashboardPage({ faces, setFaces, history, refreshHistory
   }, [token, setFaces, refreshHistory]);
 
   useEffect(() => {
+    if (!settingsReady) return;
+    const timeoutId = window.setTimeout(() => {
+      apiPost("/api/config", settings, token).catch(() => { });
+    }, 350);
+    return () => clearTimeout(timeoutId);
+  }, [settings, token, settingsReady]);
+
+  useEffect(() => {
     async function setupPush() {
+      if (!settings.popup) return;
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
       if (Notification.permission === "denied") return;
 
@@ -63,21 +77,31 @@ export default function DashboardPage({ faces, setFaces, history, refreshHistory
     }
 
     setupPush().catch(() => { });
-  }, [token]);
+  }, [token, settings.popup]);
+
+  const pushToast = (message) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { id, message }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((item) => item.id !== id));
+    }, 3200);
+  };
 
   const handleAlert = async (alert) => {
     setActiveAlert(alert);
     await apiPost("/api/alert", alert, token).catch(() => { });
-    await refreshHistory(); // Updates history respecting filters
+    await refreshHistory();
   };
 
   const handleRecognized = async (entry) => {
     if (!entry || !entry.name || entry.name === "Unknown") return;
-    await apiPost("/api/history", { name: entry.name, image: entry.image }, token).catch(() => { });
-    await refreshHistory(); // Updates history respecting filters
+    await apiPost(
+      "/api/history",
+      { name: entry.name, image: entry.image, confidence: entry.confidence, timestamp: entry.timestamp },
+      token
+    ).catch(() => { });
+    await refreshHistory();
   };
-
-
 
   if (loading) {
     return (
@@ -92,29 +116,15 @@ export default function DashboardPage({ faces, setFaces, history, refreshHistory
     <section>
       <div className="top-row">
         <h2>Live Dashboard</h2>
-        <label className="tiny-control">
-          Match threshold: {threshold.toFixed(2)}
-          <input
-            type="range"
-            min="0.35"
-            max="0.8"
-            step="0.01"
-            value={threshold}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              setThreshold(val);
-              localStorage.setItem("threshold", String(val));
-            }}
-          />
-        </label>
       </div>
+
       <div className="stat-strip">
         <div className="glass-card stat-card">
           <strong>{faces.length}</strong>
           <small>Known Faces</small>
         </div>
         <div className="glass-card stat-card">
-          <strong>{faces.filter((f) => f.is_wanted).length}</strong>
+          <strong>{faces.filter((face) => face.is_wanted).length}</strong>
           <small>Wanted Profiles</small>
         </div>
         <div className="glass-card stat-card">
@@ -124,15 +134,25 @@ export default function DashboardPage({ faces, setFaces, history, refreshHistory
       </div>
 
       <AlertBanner alert={activeAlert} />
-      <CameraCapture
+      <CameraFeed
         knownFaces={faces}
-        threshold={threshold}
-        alertPrefs={alertPrefs}
+        settings={settings}
+        onSettingsChange={setSettings}
         onAlert={handleAlert}
         onRecognized={handleRecognized}
+        onToast={pushToast}
       />
 
+      <div className="glass-card list-card history-panel">
+        <h3>Recent Detections</h3>
+        <HistoryList history={history.slice(0, 10)} />
+      </div>
 
+      <div className="toast-stack">
+        {toasts.map((toast) => (
+          <div key={toast.id} className="toast-card">{toast.message}</div>
+        ))}
+      </div>
     </section>
   );
 }
