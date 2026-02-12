@@ -193,3 +193,5 @@ Created automatically by `backend/db.js`:
 - Camera requires HTTPS except on localhost.
 - If model load fails, verify files exist in `frontend/public/models`.
 - If push notifications do not work, verify valid VAPID keys are configured.
+
+Main Developer: rehan bawakhan
